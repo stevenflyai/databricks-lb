@@ -2,6 +2,9 @@
 
 一个用于 Claude Code 的智能负载均衡代理，将 Claude API 请求分发到多个 Databricks workspace 端点。
 
+This repo is originally created by cjj198909 and jackylam0812 (2026-01-27)
+Customized and updated by different requirements. 
+
 ## 为什么需要这个项目？
 
 - **突破单一 workspace 限制**：通过多个 Databricks workspace 分散请求，提高整体吞吐量
@@ -194,7 +197,7 @@ curl http://localhost:8000/stats
 |------------|-----------------|
 | claude-*-sonnet-* | databricks-claude-sonnet-4-5 |
 | claude-*-opus-* | databricks-claude-opus-4-5 |
-| claude-*-haiku-* | databricks-claude-sonnet-4-5 (Databricks 无 haiku) |
+| claude-*-haiku-* | databricks-claude-haiku-4-5 |
 
 ## 负载均衡策略
 
