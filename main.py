@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 
 DATABRICKS_MODELS = {
     "sonnet": "databricks-claude-sonnet-4-5",
-    "opus": "databricks-claude-opus-4-5",
+    "opus": "databricks-claude-opus-4-6",
     "haiku": "databricks-claude-haiku-4-5",
 }
 
-DEFAULT_MODEL = "databricks-claude-opus-4-5"
+DEFAULT_MODEL = "databricks-claude-opus-4-6"
 UNSUPPORTED_FIELDS = {"context_management", "metadata", "output_config"}
 UNSUPPORTED_BLOCK_FIELDS = {"cache_control"}
 
@@ -95,8 +95,41 @@ def sanitize_request_body(body: dict) -> tuple[dict, bool]:
     # Normalize thinking to satisfy Databricks validation
     if "thinking" in body and isinstance(body["thinking"], dict):
         thinking = dict(body["thinking"])
+        thinking_changed = False
+        thinking_type = thinking.get("type")
         budget_tokens = thinking.get("budget_tokens")
         max_tokens = body.get("max_tokens")
+
+        if isinstance(thinking_type, str):
+            if thinking_type == "adaptive":
+                logger.info("Normalizing thinking.type: adaptive -> enabled")
+                thinking["type"] = "enabled"
+                thinking_changed = True
+            elif thinking_type not in {"enabled", "disabled"}:
+                logger.info(f"Dropping thinking: unsupported type {thinking_type!r}")
+                body = dict(body)
+                body.pop("thinking", None)
+                changed = True
+                return body, changed
+        elif thinking_type is not None:
+            logger.info("Dropping thinking: invalid type")
+            body = dict(body)
+            body.pop("thinking", None)
+            changed = True
+            return body, changed
+
+        if thinking.get("type") == "enabled" and budget_tokens is None:
+            if isinstance(max_tokens, int) and max_tokens <= 1024:
+                # Can't satisfy constraints; drop thinking
+                logger.info("Dropping thinking: max_tokens <= 1024")
+                body = dict(body)
+                body.pop("thinking", None)
+                changed = True
+                return body, changed
+            logger.info("Defaulting thinking.budget_tokens to 1024")
+            thinking["budget_tokens"] = 1024
+            budget_tokens = 1024
+            thinking_changed = True
 
         if isinstance(budget_tokens, int):
             adjusted = budget_tokens
@@ -114,14 +147,18 @@ def sanitize_request_body(body: dict) -> tuple[dict, bool]:
             if adjusted != budget_tokens:
                 logger.info(f"Adjusting thinking.budget_tokens: {budget_tokens} -> {adjusted}")
                 thinking["budget_tokens"] = adjusted
-                body = dict(body)
-                body["thinking"] = thinking
-                changed = True
+                thinking_changed = True
         elif budget_tokens is not None:
             # Unknown type; drop to avoid validation error
             logger.info("Dropping thinking: invalid budget_tokens type")
             body = dict(body)
             body.pop("thinking", None)
+            changed = True
+            return body, changed
+
+        if thinking_changed:
+            body = dict(body)
+            body["thinking"] = thinking
             changed = True
 
     return body, changed
