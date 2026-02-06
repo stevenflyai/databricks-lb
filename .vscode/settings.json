@@ -1,4 +1,0 @@
-{
-    "appService.defaultWebAppToDeploy": "/subscriptions/72f70161-e394-4864-8687-c61a76c1bd2a/resourceGroups/appsvc_linux_westus3_premium/providers/Microsoft.Web/sites/myadh2",
-    "appService.deploySubpath": "."
-}
