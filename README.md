@@ -195,8 +195,8 @@ curl http://localhost:8000/stats
 
 | Claude 模型 | Databricks 模型 |
 |------------|-----------------|
-| claude-*-sonnet-* | databricks-claude-sonnet-4-5 |
-| claude-*-opus-* | databricks-claude-opus-4-5 |
+| claude-*-sonnet-* | databricks-claude-sonnet-4-6 |
+| claude-*-opus-* | databricks-claude-opus-4-7 |
 | claude-*-haiku-* | databricks-claude-haiku-4-5 |
 
 ## 负载均衡策略

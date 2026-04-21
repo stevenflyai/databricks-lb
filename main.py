@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 # ==================== 模型名称映射 ====================
 
 DATABRICKS_MODELS = {
-    "sonnet": "databricks-claude-sonnet-4-5",
-    "opus": "databricks-claude-opus-4-6",
+    "sonnet": "databricks-claude-sonnet-4-6",
+    "opus": "databricks-claude-opus-4-7",
     "haiku": "databricks-claude-haiku-4-5",
 }
 
-DEFAULT_MODEL = "databricks-claude-opus-4-6"
-UNSUPPORTED_FIELDS = {"context_management", "metadata", "output_config"}
+DEFAULT_MODEL = "databricks-claude-opus-4-7"
+UNSUPPORTED_FIELDS = {"context_management", "metadata"}
 UNSUPPORTED_BLOCK_FIELDS = {"cache_control"}
 
 
@@ -101,11 +101,12 @@ def sanitize_request_body(body: dict) -> tuple[dict, bool]:
         max_tokens = body.get("max_tokens")
 
         if isinstance(thinking_type, str):
-            if thinking_type == "adaptive":
-                logger.info("Normalizing thinking.type: adaptive -> enabled")
-                thinking["type"] = "enabled"
+            if thinking_type == "enabled":
+                logger.info("Normalizing thinking.type: enabled -> adaptive")
+                thinking["type"] = "adaptive"
+                thinking_type = "adaptive"
                 thinking_changed = True
-            elif thinking_type not in {"enabled", "disabled"}:
+            elif thinking_type not in {"adaptive", "disabled"}:
                 logger.info(f"Dropping thinking: unsupported type {thinking_type!r}")
                 body = dict(body)
                 body.pop("thinking", None)
@@ -118,17 +119,16 @@ def sanitize_request_body(body: dict) -> tuple[dict, bool]:
             changed = True
             return body, changed
 
-        if thinking.get("type") == "enabled" and budget_tokens is None:
-            if isinstance(max_tokens, int) and max_tokens <= 1024:
-                # Can't satisfy constraints; drop thinking
-                logger.info("Dropping thinking: max_tokens <= 1024")
-                body = dict(body)
-                body.pop("thinking", None)
-                changed = True
-                return body, changed
-            logger.info("Defaulting thinking.budget_tokens to 1024")
-            thinking["budget_tokens"] = 1024
-            budget_tokens = 1024
+        if thinking.get("type") == "adaptive" and budget_tokens is not None:
+            logger.info("Removing thinking.budget_tokens because adaptive thinking does not accept it")
+            thinking.pop("budget_tokens", None)
+            budget_tokens = None
+            thinking_changed = True
+
+        if thinking.get("type") == "disabled" and budget_tokens is not None:
+            logger.info("Removing thinking.budget_tokens because thinking is disabled")
+            thinking.pop("budget_tokens", None)
+            budget_tokens = None
             thinking_changed = True
 
         if isinstance(budget_tokens, int):
@@ -610,6 +610,12 @@ async def count_tokens(request: Request):
 @app.post("/api/event_logging/batch")
 async def event_logging():
     return {"status": "ok"}
+
+
+@app.get("/")
+@app.head("/")
+async def root():
+    return {"status": "ok", "service": "databricks-claude-proxy"}
 
 
 @app.get("/health")
